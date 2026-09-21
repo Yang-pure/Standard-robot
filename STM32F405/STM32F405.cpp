@@ -44,7 +44,7 @@ Motor can1_motor[CAN1_MOTOR_NUM] = {
 	// 左前履带
 	Motor(M2006, SPD, chassis, ID7, PID(10.f, 0.0f, 1.5f, 0.f), PID(0.8f, 0.005f, 15.0f, 0.f)),
 	// 拨弹轮
-	Motor(M2006, POS, supply, ID8, PID(0.f, 0.0f, 1.5f, 0.f), PID(0.8f, 0.005f, 15.0f, 0.f))
+	Motor(M2006, SPD, supply, ID8, PID(0.5f, 0.0f, 1.5f, 0.f), PID(0.8f, 0.005f, 15.0f, 0.f))
 };
 Motor can2_motor[CAN2_MOTOR_NUM] = {
 	// 左摩擦轮
@@ -52,11 +52,17 @@ Motor can2_motor[CAN2_MOTOR_NUM] = {
 	// 右摩擦轮
 	Motor(M3508, SPD, shooter, ID2, PID(10.f, 0.0f, 1.5f, 0.f))
 };
-DMMOTOR DMmotor[3] = {
-	// 两个后腿 DM4340 与 Pitch DM4310 的具体 ID 待人工检查
-	DMMOTOR(DM_ID3, P_S, L_B),
-	DMMOTOR(DM_ID4, P_S, R_B),
-	DMMOTOR(DM_ID5, P_S, F_B)
+
+
+
+
+DMMOTOR DMmotor[3] = {	
+	//左后腿 id0x001，PS模式 正值向上
+	DMMOTOR(DM_ID1, P_S, L_B),
+	//右后腿 id0x002 PS模式 正值向下
+	DMMOTOR(DM_ID2, P_S, R_B),
+	//pitch id0x003 PS模式 正值向下
+	DMMOTOR(DM_ID3, P_S, PITCH)
 };
 
 
@@ -85,7 +91,7 @@ int main(void)
 	can2.Init(CAN2);
 	timer.Init(BASE, TIM3, 1000).BaseInit();
 
-	imu_pantile.Init(&uart1, USART1, 115200, CH010);
+	imu_pantile.Init(&uart4, UART4, 115200, CH010);
 	rc.Init(&uart2, USART2, 100000);
 	power.Init(&uart5,UART5,9600);
 	xuc.Init(&uart6, USART6, 115200);
