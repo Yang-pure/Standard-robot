@@ -52,10 +52,6 @@ Motor can2_motor[CAN2_MOTOR_NUM] = {
 	// 右摩擦轮
 	Motor(M3508, SPD, shooter, ID2, PID(10.f, 0.0f, 1.5f, 0.f))
 };
-
-
-
-
 DMMOTOR DMmotor[3] = {	
 	//左后腿 id0x001，PS模式 正值向上
 	DMMOTOR(DM_ID1, P_S, L_B),
