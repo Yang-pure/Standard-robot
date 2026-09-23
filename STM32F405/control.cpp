@@ -38,10 +38,10 @@ void CONTROL::Control_Chassis(float speedx, float speedy, float speedz)
 {
 	
 	const int32_t wheel_speed[4] = {
-		static_cast<int32_t>(+speedx + speedy -  speedz), // ID1 后右  后右
-		static_cast<int32_t>(+speedx - speedy -  speedz), // ID2 后左  前右
-		static_cast<int32_t>(-speedx - speedy -  speedz), // ID3 前左  前左
-		static_cast<int32_t>(-speedx + speedy -  speedz)  // ID4 前右  后左*/
+		static_cast<int32_t>(+speedx + speedy +  speedz), // ID1 后右  后右
+		static_cast<int32_t>(+speedx - speedy +  speedz), // ID2 后左  前右
+		static_cast<int32_t>(-speedx - speedy +  speedz), // ID3 前左  前左
+		static_cast<int32_t>(-speedx + speedy +  speedz)  // ID4 前右  后左*/
 	};
 
 	for (int i = 0; i < 4; i++)

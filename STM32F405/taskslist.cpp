@@ -10,6 +10,7 @@
 #include "delay.h"
 #include "HTmotor.h"
 #include "Power_read.h"
+#include "xuc.h"
 float Kp = 10;
 float Kd = 0.6;
 extern int start_flag;
@@ -140,12 +141,19 @@ void ControlTask(void* pvParameters)
 
 void DecodeTask(void* pvParameters)
 {
+	TickType_t lastXucTxTick = xTaskGetTickCount();
 	while (true)
 	{
 		rc.Decode();
 
 		imu_pantile.Decode();
-
+		xuc.Decode();
+		const TickType_t now = xTaskGetTickCount();
+		if (now - lastXucTxTick >= pdMS_TO_TICKS(10))
+		{
+			xuc.Encode();
+			lastXucTxTick = now;
+		}
 		vTaskDelay(5);
 	}
 }

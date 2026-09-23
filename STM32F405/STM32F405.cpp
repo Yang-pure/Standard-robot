@@ -38,7 +38,7 @@ Motor can1_motor[CAN1_MOTOR_NUM] = {
 	// 底盘左后
 	Motor(M3508, SPD, chassis, ID4, PID(10.f, 0.0f, 1.5f, 0.f)),
 	// 云台 Yaw（硬件 ID1，工程 ID5）
-	Motor(M6020, POS, pantile, ID5, PID(40.f, 0.0f, 1.5f, 0.f), PID(0.8f, 0.005f, 15.0f, 0.f)),
+	Motor(M6020, POS, pantile, ID5, PID(0.f, 0.0f, 1.5f, 0.f), PID(0.8f, 0.005f, 15.0f, 0.f)),
 	// 右前履带
 	Motor(M2006, SPD, chassis, ID6, PID(10.f, 0.0f, 1.5f, 0.f), PID(0.8f, 0.005f, 15.0f, 0.f)),
 	// 左前履带
@@ -90,7 +90,7 @@ int main(void)
 	imu_pantile.Init(&uart4, UART4, 115200, CH010);
 	rc.Init(&uart2, USART2, 100000);
 	power.Init(&uart5,UART5,9600);
-	xuc.Init(&uart6, USART6, 115200);
+	xuc.Init(&uart6, USART6, 460800);
 
 	para.Init();
 

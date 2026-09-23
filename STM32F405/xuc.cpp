@@ -82,7 +82,7 @@ void XUC::Encode()
 	Tx_TJ.bullet_speed_TJ = std::isfinite(bulletSpeed) ? bulletSpeed : 0.0f;
 	Tx_TJ.bullet_count_TJ = frameCounter++;
 	Tx_TJ.imu_pitch_TJ = imu_pantile.GetAnglePitch();
-	Tx_TJ.imu_yaw_TJ = imu_chassis.GetAngleYaw();
+	Tx_TJ.imu_yaw_TJ = imu_pantile.GetAngleYaw();
 	Tx_TJ.imu_roll_TJ = imu_pantile.GetAngleRoll();
 
 	memcpy(tx_data, &Tx_TJ, sizeof(Tx_TJ));
