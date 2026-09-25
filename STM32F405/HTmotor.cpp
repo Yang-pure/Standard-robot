@@ -42,7 +42,7 @@ void DMMOTOR::DMmotor_transmit(uint32_t id)
 
 void DMMOTOR::DMmotorinit()
 {
-	CanComm_ControlCmd(can2, CMD_MOTOR_MODE, MOTOR_MODE + 1);
+	CanComm_ControlCmd(can2, CMD_MOTOR_MODE, MOTOR_MODE + ID);
 	delay.delay_ms(1);
 }
 
@@ -141,6 +141,7 @@ void DMMOTOR::DMmotor_Ontimer(CAN hcan, float f_kp, float f_kd, uint8_t* odata)
 		break;
 
 	case 0x100:
+		//根据DM官方协议，前四位为位置，后四位为速度，小端序
 		odata[0] = P[0];
 		odata[1] = P[1];
 		odata[2] = P[2];

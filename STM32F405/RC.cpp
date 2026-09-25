@@ -95,7 +95,9 @@ void RC::RC_Control() {
 		{
 			ctrl.chassis.speedx = rc.ch[0] * para.max_speed / 660.f;
 			ctrl.chassis.speedy = rc.ch[1] * para.max_speed / 660.f;
-			ctrl.chassis.speedz = 0;
+			ctrl.chassis.speedz = rc.ch[2] * para.max_speed / 660.f;
+			DMmotor[2].setPos = -rc.ch[3] * 1.0 / 660.f;
+			DMmotor[2].setSpeed = 2.0f;
 		}
 
 			break;
