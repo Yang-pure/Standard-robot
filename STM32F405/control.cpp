@@ -65,12 +65,40 @@ void CONTROL::PANTILE::Keep_Pantile(float angleKeep, PANTILE::TYPE type,IMU fram
 
 void CONTROL::CHASSIS::Keep_Direction()
 {
+	Motor* yaw_motor = ctrl.pantile_motor[PANTILE::YAW];
+	if (yaw_motor == nullptr)
+	{
+		return;
+	}
 
+	// 以发射口正对底盘前方时的编码器值为零点，求云台相对底盘的最短偏角。
+	float yaw_delta = yaw_motor->angle[now] - para.initial_yaw;
+	while (yaw_delta > 4096.0f)
+	{
+		yaw_delta -= 8192.0f;
+	}
+	while (yaw_delta < -4096.0f)
+	{
+		yaw_delta += 8192.0f;
+	}
+
+	const float yaw_rad = yaw_delta * 2.0f * PI / 8192.0f;
+	const float command_x_gimbal = static_cast<float>(speedx);
+	const float command_y_gimbal = static_cast<float>(speedy);
+
+	// 将以云台发射口为参考的平移指令转换到底盘自身坐标系。
+	speedx = static_cast<int32_t>(command_x_gimbal * cosf(yaw_rad) - command_y_gimbal * sinf(yaw_rad));
+	speedy = static_cast<int32_t>(command_x_gimbal * sinf(yaw_rad) + command_y_gimbal * cosf(yaw_rad));
 
 }
 
 void CONTROL::CHASSIS::Update()
 {
+	if (ctrl.mode == CONTROL::ROTATION)
+	{
+		Keep_Direction();
+	}
+
 	ctrl.Control_Chassis(speedx, speedy, speedz);
 }
 
