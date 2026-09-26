@@ -49,7 +49,9 @@ public:
 		bool fraction = false;
 		bool fullheat_shoot = false;
 		bool heat_ulimit = false;
+		bool single_shot_ready = false;
 		int16_t shoot_speed = 6000;
+		void RequestSingleShot(int16_t channel);
 		void Update();
 	};
 

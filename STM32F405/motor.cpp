@@ -101,6 +101,8 @@ void Motor::Ontimer(uint8_t idata[][8], uint8_t* odata)//idate: receive;odate: t
 		//getword把前面高低八位的数据整合到一起为完整速度，
 		curspeed = getword(idata[trainsmit_or_receive_ID][2], idata[trainsmit_or_receive_ID][3]);
 	}
+	// 先更新累计角度，供 ACE 的多圈拨弹位置判断使用。
+	recorded_the_Laps();
 	//----------------------------------------------------------------
 	/*if (this->type == M6020)
 	{
@@ -111,21 +113,31 @@ void Motor::Ontimer(uint8_t idata[][8], uint8_t* odata)//idate: receive;odate: t
 	//模式设置，待分工编写
 	if (mode == ACE)
 	{
-
 		if (spinning)
 		{
-
+			pd = false;
+			need_curcircle = 0;
+			setcurrent = pid[speed].Position(setspeed - curspeed, pid[speed].max_limit);
+			current = setcurrent;
 		}
 		else {
-			if (need_curcircle > 0)
-			{
-				
-
+			if (pd) {
+				pd = false;
+				if (need_curcircle == 0)
+					stopAngle = sum_angle;
+				// 单发目标行程：85000 个电机编码值，可按实际出弹位置调整。
+				stopAngle += 85000;
+				need_curcircle = 1;
 			}
-			else if (need_curcircle <= 0)
-			{
-
+			const int32_t remaining = stopAngle - sum_angle;
+			if (need_curcircle > 0 && remaining > 100)
+				setspeed = std::min<int32_t>(adjspeed, remaining / 2);
+			else {
+				setspeed = 0;
+				need_curcircle = 0;
 			}
+			setcurrent = pid[speed].Position(setspeed - curspeed, pid[speed].max_limit);
+			current = setcurrent;
 		}
 		if (setspeed == 0 && curspeed == 0)
 		{
@@ -141,7 +153,7 @@ void Motor::Ontimer(uint8_t idata[][8], uint8_t* odata)//idate: receive;odate: t
 	//位置环
 	else if (mode == POS)
 	{
-		setspeed = pid[position].Position(setangle - angle[now], pid[position].max_limit);
+		setspeed = pid[position].Position(getdeltaa(setangle - angle[now]), pid[position].max_limit);
 		setcurrent = pid[speed].Position(setspeed - curspeed, pid[speed].max_limit);
 		current = setcurrent;
 	}
@@ -151,8 +163,6 @@ void Motor::Ontimer(uint8_t idata[][8], uint8_t* odata)//idate: receive;odate: t
 		setcurrent = pid[speed].Position(setspeed - curspeed, pid[speed].max_limit);
 		current = setcurrent;
 	}
-	//记录总的编码值sum_angle
-	recorded_the_Laps();
 	//将机械角度转为距离
 	GetDistanceFromMechanicalAngle();
 	//角度更新

@@ -55,7 +55,7 @@ public:
 	uint8_t getStatus()const;
 	int32_t current{}, curspeed{}, setcurrent{},setspeed{}, torque_current, motor_status, motor_angle_status, sum_angle{};//这个current用于输出电流或者电压
 	int16_t adjspeed{};
-	int16_t maxspeed{}, maxcurrent{};
+	int16_t maxspeed{}, maxcurrent{2000};
 	Kalman currentKalman{ 1.f,40.f };
 	int temperature;
 	int32_t stopAngle;

@@ -13,6 +13,9 @@ void RC::Init(UART* huart, USART_TypeDef* Instance, const uint32_t BaudRate)
 void RC::OnRC()
 {
 	RC_CheckState();
+	if (!m_hasValidFrame ||
+		(xTaskGetTickCount() - m_lastValidFrameTick) > pdMS_TO_TICKS(100))
+		ctrl.mode = CONTROL::RESET;
 	RC_Control();
 
 	if (Shift_mode())
@@ -74,12 +77,24 @@ void RC::RC_CheckState() {
 		break;
 
 	default:
+		ctrl.mode = CONTROL::RESET;
 		break;
 	}
 
 }
 
 void RC::RC_Control() {
+	if (ctrl.mode != CONTROL::FIRE && ctrl.mode != CONTROL::SPINNING)
+	{
+		ctrl.supply_motor[0]->pd = false;
+		ctrl.supply_motor[0]->need_curcircle = 0;
+	}
+	if (ctrl.mode != CONTROL::SPINNING)
+	{
+		ctrl.supply_motor[0]->setspeed = 0;
+		ctrl.supply_motor[0]->spinning = false;
+		ctrl.shooter.openRub = false;
+	}
 	if (ctrl.mode != CONTROL::RESET)
 	{
 
@@ -111,11 +126,19 @@ void RC::RC_Control() {
 			break;
 
 		case CONTROL::AUTOAIM:
-
 			break;
 
 		case CONTROL::FIRE:
-
+			ctrl.shooter.supply_bullet = true;
+			/*ctrl.chassis.speedx = rc.ch[0] * para.max_speed / 660.f;
+			ctrl.chassis.speedy = rc.ch[1] * para.max_speed / 660.f;*/
+			if (rc.ch[0] >= 200 || rc.ch[0] <= -200)
+			{
+				ctrl.pantile_motor[0]->setangle += -rc.ch[0] * 30.f / 660.f;
+			}
+			DMmotor[2].setPos = -rc.ch[1] * 1.0f / 660.f;
+			DMmotor[2].setSpeed = 1.0f;
+			ctrl.shooter.RequestSingleShot(rc.ch[3]);
 			break;
 
 		case CONTROL::STOP:
@@ -123,7 +146,9 @@ void RC::RC_Control() {
 			break;
 
 		case CONTROL::SPINNING:
-
+			ctrl.supply_motor[0]->spinning = true;
+			ctrl.shooter.openRub = (rc.ch[0] > 100);
+			can1_motor[7].setspeed = rc.ch[0]* 4000.f / 660.f;
 			break;
 
 		default:
@@ -158,9 +183,12 @@ void RC::Decode()
 	else {
 		pd_Rx = xQueueReceive(*queueHandler, m_frame, 0);
 	}
+	if (pd_Rx != pdTRUE) return;
 
 	if (sizeof(m_frame) < 18) return;
 	if ((m_frame[0] | m_frame[1] | m_frame[2] | m_frame[3] | m_frame[4] | m_frame[5]) == 0)return;
+	m_lastValidFrameTick = xTaskGetTickCount();
+	m_hasValidFrame = true;
 
 	rc.ch[0] = ((m_frame[0] | m_frame[1] << 8) & 0x07FF) - 1024;
 	rc.ch[1] = ((m_frame[1] >> 3 | m_frame[2] << 5) & 0x07FF) - 1024;

@@ -1,6 +1,8 @@
 #include "can.h"
 #include "label.h"
 #include "string.h"
+#include "motor.h"
+#include "control.h"
 
 /*
 * @brief		CAN通信初始化函数
@@ -134,8 +136,31 @@ HAL_StatusTypeDef CAN::Transmit(const uint32_t ID, const uint8_t* const pData, c
 */
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {
-	if (hcan == &can1.hcan)
+	if (hcan == &can1.hcan) {
 		memcpy(can1.data[hcan->pRxMsg->StdId - 0x201], hcan->pRxMsg->Data, sizeof(uint8_t) * 8);
+		if (hcan->pRxMsg->StdId == 0x205)
+		{
+			static bool yaw_initialized = false;
+			if (!yaw_initialized && hcan->pRxMsg->DLC == 8)
+			{
+				ctrl.pantile_motor[0]->setangle =
+					(static_cast<uint16_t>(hcan->pRxMsg->Data[0]) << 8)
+					| hcan->pRxMsg->Data[1];
+				yaw_initialized = true;
+			}
+		}
+		if (hcan->pRxMsg->StdId == 0x208)
+		{
+			static bool supply_initialized = false;
+			if (!supply_initialized && hcan->pRxMsg->DLC == 8)
+			{
+				ctrl.supply_motor[0]->setangle =
+					(static_cast<uint16_t>(hcan->pRxMsg->Data[0]) << 8)
+					| hcan->pRxMsg->Data[1];
+				supply_initialized = true;
+			}
+		}
+	}
 	else
 	{
 		if (hcan->pRxMsg->StdId >= 1 && hcan->pRxMsg->StdId <= 3)

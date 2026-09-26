@@ -53,6 +53,8 @@ public:
 	void RC_Control();
 
 private:
+	volatile TickType_t m_lastValidFrameTick = 0;
+	volatile bool m_hasValidFrame = false;
 	QueueHandle_t* queueHandler = NULL;
 	BaseType_t pd_Rx, pd_Tx;
 	UART* m_uart;

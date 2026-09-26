@@ -63,7 +63,7 @@ public:
 		return result;
 	}
 	float m_Kp, m_Ti, m_Td;
-	float max_limit = 1000.0f;
+	float max_limit = 10000.0f;
 	float m_error[3] = { 0 };
 private:
 	float m_alpha = 0.f, m_lderivative = 0.f;

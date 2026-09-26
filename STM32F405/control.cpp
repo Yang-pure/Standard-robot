@@ -2,6 +2,7 @@
 #include "tim.h"
 #include "judgement.h"
 #include "HTmotor.h"
+#include "RC.h"
 
 void CONTROL::Init(std::vector<Motor*> motor)
 {
@@ -20,17 +21,17 @@ void CONTROL::Init(std::vector<Motor*> motor)
 			shooter_motor[num3++] = motor[i];
 			break;
 		case(function_type::supply):
+			supply_motor[num4] = motor[i];
 			supply_motor[num4]->spinning = false;
 			supply_motor[num4]->need_curcircle = false;
-			supply_motor[num4++] = motor[i];
+			++num4;
 		default:
 			break;
 		}
 	}
 	if (pantile_motor[PANTILE::TYPE::PITCH] != nullptr)
 		pantile_motor[PANTILE::TYPE::PITCH]->setangle = para.initial_pitch;
-	if (pantile_motor[PANTILE::TYPE::YAW] != nullptr)
-		pantile_motor[PANTILE::TYPE::YAW]->setangle = para.initial_yaw;
+
 }
 
 void CONTROL::Control_Chassis(float speedx, float speedy, float speedz)
@@ -63,6 +64,20 @@ void CONTROL::PANTILE::Keep_Pantile(float angleKeep, PANTILE::TYPE type,IMU fram
 	
 }
 
+void CONTROL::SHOOTER::RequestSingleShot(int16_t channel)
+{
+	openRub = (channel > 100);
+
+	if (channel <= 100)
+	{
+		single_shot_ready = true;  // 松开后允许下一发
+	}
+	else if (channel >= 330 && single_shot_ready)
+	{
+		ctrl.supply_motor[0]->pd = true;
+		single_shot_ready = false;
+	}
+}
 void CONTROL::CHASSIS::Keep_Direction()
 {
 	Motor* yaw_motor = ctrl.pantile_motor[PANTILE::YAW];
@@ -104,13 +119,37 @@ void CONTROL::CHASSIS::Update()
 
 void CONTROL::PANTILE::Update()
 {
-	
+	if (ctrl.pantile_motor[0]->setangle > 8192.0)
+	{
+		ctrl.pantile_motor[0]->setangle -= 8192.0;
+	}
+	if (ctrl.pantile_motor[0]->setangle < 0.0)
+	{
+		ctrl.pantile_motor[0]->setangle += 8192.0;
+	}
 }
 
 void CONTROL::SHOOTER::Update()
 {
-	
+	if (ctrl.mode == RESET)
+	{
+		openRub = false;
+		supply_bullet = false;
+		auto_shoot = false;
+	}
+	const int16_t speed = ((ctrl.mode == SPINNING || ctrl.mode == FIRE )&& openRub) ? shoot_speed : 0;
+	ctrl.shooter_motor[0]->setspeed = speed;
+	ctrl.shooter_motor[1]->setspeed = -speed;
+	if (ctrl.supply_motor[0]->setangle > 8192.0)
+	{
+		ctrl.supply_motor[0]->setangle -= 8192.0;
+	}
+	if (ctrl.supply_motor[0]->setangle < 0.0)
+	{
+		ctrl.supply_motor[0]->setangle += 8192.0;
+	}
 }
+
 
 float CONTROL::CHASSIS::Ramp(float setval, float curval, uint32_t RampSlope)
 {
