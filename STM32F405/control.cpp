@@ -236,7 +236,7 @@ void CONTROL::VisionFire()
 	}
 	const TickType_t nowTick = xTaskGetTickCount();
 	RxPacket_TJ command{};
-	const bool valid = xuc.GetVisionCommand(command, nowTick);
+	const bool valid = xuc.GetVisionCommand(command, nowTick) && imu_pantile.Fresh();
 	Motor* feeder = supply_motor[0];
 	const int32_t readyRpm = (shooter.shoot_speed < shooter_motor[0]->maxspeed ? shooter.shoot_speed : shooter_motor[0]->maxspeed) * 4 / 5;
 	const bool frictionReady = std::abs(shooter_motor[0]->curspeed) >= readyRpm && std::abs(shooter_motor[1]->curspeed) >= readyRpm;
@@ -252,7 +252,7 @@ void CONTROL::VisionFire()
 	}
 	else
 	{
-		float yawTarget = 0.0f, pitchTarget = 0.0f;
+		float yawTarget = pantile_motor[0]->setangle, pitchTarget = DMmotor[2].setPos;
 		if (VisionAim(command.yaw_TJ, command.pitch_TJ, imu_pantile.GetAngleYaw(), imu_pantile.GetAnglePitch(), pantile_motor[0]->angle[now], DMmotor[2].pos, yawTarget, pitchTarget))
 		{
 			pantile_motor[0]->setangle = yawTarget;

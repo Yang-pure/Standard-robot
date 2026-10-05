@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstdint>
 
-// 视觉角度是 IMU 零点下的绝对角（度）；电机目标由当前反馈计算，避免累加漂移。
+// 视觉角度是 IMU 零点下的绝对角（度）；沿用上轮电机目标积分误差，补偿负载造成的静差。
 inline bool VisionAim(float targetYawDeg, float targetPitchDeg, float currentYawDeg, float currentPitchDeg, float yawEncoder, float pitchPosition, float& yawTarget, float& pitchTarget)
 {
     if (!std::isfinite(targetYawDeg) || !std::isfinite(targetPitchDeg) || !std::isfinite(currentYawDeg) || !std::isfinite(currentPitchDeg) || !std::isfinite(yawEncoder) || !std::isfinite(pitchPosition))
@@ -20,7 +20,16 @@ inline bool VisionAim(float targetYawDeg, float targetPitchDeg, float currentYaw
     {
         yawError = -10.0f;
     }
-    yawTarget = yawEncoder + yawError * (8192.0f / 360.0f);
+    yawTarget = yawEncoder + std::remainder(yawTarget - yawEncoder, 8192.0f);
+    yawTarget += yawError * (8192.0f / 360.0f) * 0.1f;
+    if (yawTarget > yawEncoder + 10.0f * 8192.0f / 360.0f)
+    {
+        yawTarget = yawEncoder + 10.0f * 8192.0f / 360.0f;
+    }
+    if (yawTarget < yawEncoder - 10.0f * 8192.0f / 360.0f)
+    {
+        yawTarget = yawEncoder - 10.0f * 8192.0f / 360.0f;
+    }
 
     float pitchError = targetPitchDeg - currentPitchDeg;
     if (pitchError > 12.0f)
@@ -31,7 +40,15 @@ inline bool VisionAim(float targetYawDeg, float targetPitchDeg, float currentYaw
     {
         pitchError = -12.0f;
     }
-    pitchTarget = pitchPosition + pitchError * (3.1415926f / 180.0f);
+    pitchTarget += pitchError * (3.1415926f / 180.0f) * 0.1f;
+    if (pitchTarget > pitchPosition + 12.0f * 3.1415926f / 180.0f)
+    {
+        pitchTarget = pitchPosition + 12.0f * 3.1415926f / 180.0f;
+    }
+    if (pitchTarget < pitchPosition - 12.0f * 3.1415926f / 180.0f)
+    {
+        pitchTarget = pitchPosition - 12.0f * 3.1415926f / 180.0f;
+    }
     if (pitchTarget > 1.0f)
     {
         pitchTarget = 1.0f;

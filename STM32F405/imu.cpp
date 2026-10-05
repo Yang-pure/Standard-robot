@@ -1,5 +1,6 @@
 #include "imu.h"
 #include "label.h"
+#include "imu_frame.h"
 void IMU::Init(UART* huart, USART_TypeDef* Instance, const uint32_t BaudRate, IMU_TYPE type)
 {
 	huart->Init(Instance, BaudRate).DMARxInit();
@@ -16,6 +17,7 @@ void IMU::Decode()
 	else {
 		pd_Rx = xQueueReceive(*queueHandler, rxData, 0);
 	}
+	if (pd_Rx != pdTRUE) return;
 
 	if (type == IMU601)
 	{
@@ -51,8 +53,7 @@ void IMU::Decode()
 	{
 		if (rxData[0] == 0x5A && rxData[1] == 0xA5)
 		{
-			//Check(rxData, 4, 0);
-			if (Check(rxData + 6, rxData[3] << 8 + rxData[2], rxData[5] << 8 + rxData[4]))
+			if (ImuFrameValid(rxData, sizeof(rxData)))
 			{
 				if (rxData[6] == 0x91)
 				{
@@ -66,18 +67,17 @@ void IMU::Decode()
 					angle.pitch = R4(rxData + offset + 48);
 					angle.roll = R4(rxData + offset + 52);
 					angle.yaw = R4(rxData + offset + 56);
+					lastTick = xTaskGetTickCount();
 
 				}
 			}
-			crc = 0;
 		}
 	}
 	else if (type == HI226)
 	{
 		if (rxData[0] == 0x5A && rxData[1] == 0xA5)
 		{
-			//Check(rxData, 4, 0);
-			if (Check(rxData + 6, rxData[3] << 8 + rxData[2], rxData[5] << 8 + rxData[4]))
+			if (ImuFrameValid(rxData, sizeof(rxData)))
 			{
 				if (rxData[6] == 0x91)
 				{
@@ -91,6 +91,7 @@ void IMU::Decode()
 					angle.pitch = R4(rxData + offset + 48);
 					angle.roll = R4(rxData + offset + 52);
 					angle.yaw = R4(rxData + offset + 56);
+					lastTick = xTaskGetTickCount();
 				}
 			}
 		}
@@ -100,6 +101,11 @@ void IMU::Decode()
 float IMU::GetAngleYaw()
 {
 	return angle.yaw;
+}
+
+bool IMU::Fresh()
+{
+	return lastTick != 0 && xTaskGetTickCount() - lastTick <= pdMS_TO_TICKS(100);
 }
 
 float IMU::getangularvelocitypitch()
@@ -135,25 +141,6 @@ bool IMU::Check(uint8_t* pdata, uint8_t len, uint32_t com)
 			t += pdata[i];
 		}
 		return t == com;
-	}
-	else if (type == CH010 || type == HI226)
-	{
-		for (int j = 0; j < len; ++j)
-		{
-			uint32_t i;
-			uint32_t byte = pdata[j];
-			crc ^= byte << 8;
-			for (i = 0; i < 8; ++i)
-			{
-				uint32_t temp = crc << 1;
-				if (crc & 0x8000)
-				{
-					temp ^= 0x1021;
-				}
-				crc = temp;
-			}
-		}
-		return crc == com;
 	}
 	return false;
 }

@@ -21,6 +21,7 @@ public:
 	void Decode();
 	bool Check(uint8_t* pdata, uint8_t len, uint32_t com);
 	float GetAngleYaw();
+	bool Fresh();
 	float GetAnglePitch();
 	float GetAngleRoll();
 	float getangularvelocitypitch();
@@ -34,7 +35,7 @@ private:
 	AngularVelocity angularvelocity;
 	Acceleration acceleration;
 	float accelerationData[3]{};
-	uint16_t crc, len;
+	TickType_t lastTick = 0;
 	IMU_TYPE type;
 
 	uint8_t rxData[UART_MAX_LEN];
