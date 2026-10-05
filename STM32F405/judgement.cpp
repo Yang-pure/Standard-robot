@@ -279,28 +279,37 @@ void Judgement::DisplpayMode(uint8_t mode)
 	{
 	case CONTROL::MODE::RESET:
 	{
-		modeChar[0] = 'L';
-		modeChar[1] = 'O';
-		modeChar[2] = 'C';
-		modeChar[3] = 'K';
+		modeChar[0] = 'R';
+		modeChar[1] = 'E';
+		modeChar[2] = 'S';
+		modeChar[3] = 'E';
+		modeChar[4] = 'T';
 	}
 	break;
-	case CONTROL::MODE::FOLLOW:
-	{
-		modeChar[0] = 'F';
-		modeChar[1] = 'O';
-		modeChar[2] = 'L';
-		modeChar[3] = 'L';
-		modeChar[4] = 'O';
-		modeChar[5] = 'W';
-	}
-	break;
-	case CONTROL::MODE::ROTATION:
+	case CONTROL::MODE::RC_FOLLOW:
 	{
 		modeChar[0] = 'R';
-		modeChar[1] = 'O';
-		modeChar[2] = 'T';
-		modeChar[3] = 'A';
+		modeChar[1] = 'C';
+		modeChar[2] = 'F';
+		modeChar[3] = 'O';
+		modeChar[4] = 'L';
+	}
+	break;
+	case CONTROL::MODE::YAW_FOLLOW:
+	{
+		modeChar[0] = 'Y';
+		modeChar[1] = 'A';
+		modeChar[2] = 'W';
+		modeChar[3] = 'F';
+		modeChar[4] = 'O';
+		modeChar[5] = 'L';
+	}
+	break;
+	case CONTROL::MODE::PANTILE_CONTROL:
+	{
+		modeChar[0] = 'P';
+		modeChar[1] = 'A';
+		modeChar[2] = 'N';
 	}
 	break;
 	case CONTROL::MODE::SEPARATE:

@@ -12,17 +12,27 @@ void RC::Init(UART* huart, USART_TypeDef* Instance, const uint32_t BaudRate)
 
 void RC::OnRC()
 {
-	RC_CheckState();
-	if (!m_hasValidFrame ||
-		(xTaskGetTickCount() - m_lastValidFrameTick) > pdMS_TO_TICKS(100))
-		ctrl.mode = CONTROL::RESET;
-	RC_Control();
-
-	if (Shift_mode())
+	if (!m_hasValidFrame || (xTaskGetTickCount() - m_lastValidFrameTick) > pdMS_TO_TICKS(100))
 	{
-
+		if (ctrl.mode != CONTROL::RESET)
+		{
+			ctrl.HoldPose();
+			ctrl.shooter.single_shot_ready = false;
+		}
+		ctrl.mode = CONTROL::RESET;
 	}
-
+	else
+	{
+		if (Shift_mode() || (ctrl.mode == CONTROL::RESET && input.s[0] >= UP && input.s[0] <= MID && input.s[1] >= UP && input.s[1] <= MID && RC_STATE(input.s[0], input.s[1]) != RC_STATE(MID, MID)))
+		{
+			ctrl.HoldPose();
+			ctrl.shooter.single_shot_ready = false;
+			previous.s[0] = input.s[0];
+			previous.s[1] = input.s[1];
+		}
+		RC_CheckState();
+	}
+	RC_Control();
 }
 
 void RC::OnPC()
@@ -38,14 +48,14 @@ void RC::Update()
 
 void RC::RC_CheckState() {
 
-	switch (RC_STATE(rc.s[0], rc.s[1]))
+	switch (RC_STATE(input.s[0], input.s[1]))
 	{
 	case RC_STATE(UP, UP):
-		ctrl.mode = CONTROL::ROTATION;
+		ctrl.mode = CONTROL::YAW_FOLLOW;
 		break;
 
 	case RC_STATE(UP, MID):
-		ctrl.mode = CONTROL::ROTATION;
+		ctrl.mode = CONTROL::PANTILE_CONTROL;
 		break;
 
 	case RC_STATE(UP, DOWN):
@@ -53,7 +63,7 @@ void RC::RC_CheckState() {
 		break;
 
 	case RC_STATE(MID, UP):
-		ctrl.mode = CONTROL::FOLLOW;
+		ctrl.mode = CONTROL::RC_FOLLOW;
 		break;
 
 	case RC_STATE(MID, MID):
@@ -84,12 +94,30 @@ void RC::RC_CheckState() {
 }
 
 void RC::RC_Control() {
+	if (ctrl.mode != CONTROL::YAW_FOLLOW && ctrl.mode != CONTROL::RC_FOLLOW && ctrl.mode != CONTROL::PANTILE_CONTROL && ctrl.mode != CONTROL::SEPARATE)
+	{
+		ctrl.chassis.speedx = 0;
+		ctrl.chassis.speedy = 0;
+		ctrl.chassis.speedz = 0;
+		ctrl.Control_Chassis(0, 0, 0);
+	}
+	if (ctrl.mode != CONTROL::SEPARATE)
+	{
+		can1_motor[5].setspeed = 0;
+		can1_motor[6].setspeed = 0;
+	}
+	if (ctrl.mode != CONTROL::FIRE && visionActive)
+	{
+		ctrl.StopVision();
+		visionActive = false;
+	}
 	if (ctrl.mode != CONTROL::FIRE && ctrl.mode != CONTROL::SPINNING)
 	{
 		ctrl.supply_motor[0]->pd = false;
 		ctrl.supply_motor[0]->need_curcircle = 0;
+		ctrl.shooter.single_shot_ready = false;
 	}
-	if (ctrl.mode != CONTROL::SPINNING)
+	if (ctrl.mode != CONTROL::SPINNING && ctrl.mode != CONTROL::FIRE)
 	{
 		ctrl.supply_motor[0]->setspeed = 0;
 		ctrl.supply_motor[0]->spinning = false;
@@ -97,58 +125,49 @@ void RC::RC_Control() {
 	}
 	if (ctrl.mode != CONTROL::RESET)
 	{
-
-		/*ctrl.chassis.speedx = rc.ch[3] * 4000.f / 660.f;
-		ctrl.chassis.speedy = -1 * rc.ch[2] * 4000.f / 660.f;
-		ctrl.chassis.speedz = 0;*/
-
-		//ctrl.chassis.Keep_Direction();
-
 		switch (ctrl.mode)
 		{
-		case CONTROL::ROTATION:
-		{
-			ctrl.chassis.speedx = rc.ch[0] * para.max_speed / 660.f;
-			ctrl.chassis.speedy = rc.ch[1] * para.max_speed / 660.f;
-			ctrl.chassis.speedz = rc.ch[2] * para.max_speed / 660.f;
-			DMmotor[2].setPos = -rc.ch[3] * 1.0 / 660.f;
-			DMmotor[2].setSpeed = 2.0f;
-		}
-
+		case CONTROL::YAW_FOLLOW:
+			ctrl.chassis.speedx = input.ch[0] * para.max_speed / 660.f;
+			ctrl.chassis.speedy = input.ch[1] * para.max_speed / 660.f;
+			ctrl.chassis.speedz = input.ch[2] * para.max_speed / 660.f;
+			ctrl.MoveYaw();
 			break;
 
-		case CONTROL::FOLLOW:
+		case CONTROL::PANTILE_CONTROL:
+			ctrl.chassis.speedx = input.ch[0] * para.max_speed / 660.f;
+			ctrl.chassis.speedy = input.ch[1] * para.max_speed / 660.f;
+			ctrl.chassis.speedz = 0;
+			ctrl.MoveYaw();
+			ctrl.MovePitch();
+			break;
 
+		case CONTROL::RC_FOLLOW:
+			ctrl.chassis.speedx = input.ch[0] * para.max_speed / 660.f;
+			ctrl.chassis.speedy = input.ch[1] * para.max_speed / 660.f;
+			ctrl.chassis.speedz = input.ch[2] * para.max_speed / 660.f;
+			ctrl.MovePitch();
 			break;
 
 		case CONTROL::SEPARATE:
-
+			ctrl.SeparateDrive();
 			break;
 
 		case CONTROL::AUTOAIM:
 			break;
 
 		case CONTROL::FIRE:
-			ctrl.shooter.supply_bullet = true;
-			/*ctrl.chassis.speedx = rc.ch[0] * para.max_speed / 660.f;
-			ctrl.chassis.speedy = rc.ch[1] * para.max_speed / 660.f;*/
-			if (rc.ch[0] >= 200 || rc.ch[0] <= -200)
-			{
-				ctrl.pantile_motor[0]->setangle += -rc.ch[0] * 30.f / 660.f;
-			}
-			DMmotor[2].setPos = -rc.ch[1] * 1.0f / 660.f;
-			DMmotor[2].setSpeed = 1.0f;
-			ctrl.shooter.RequestSingleShot(rc.ch[3]);
+			ctrl.VisionFire();
 			break;
 
 		case CONTROL::STOP:
-
+			ctrl.StopMotors();
 			break;
 
 		case CONTROL::SPINNING:
-			ctrl.supply_motor[0]->spinning = true;
-			ctrl.shooter.openRub = (rc.ch[0] > 100);
-			can1_motor[7].setspeed = rc.ch[0]* 4000.f / 660.f;
+			ctrl.shooter.ManualFire();
+			ctrl.MoveYaw();
+			ctrl.MovePitch();
 			break;
 
 		default:
@@ -158,20 +177,9 @@ void RC::RC_Control() {
 			break;
 		}
 	}
-	else {
-		can1_motor[0].setspeed = 0;
-		can1_motor[1].setspeed = 0;
-		can1_motor[2].setspeed = 0;
-		can1_motor[3].setspeed = 0;
-		can1_motor[4].setspeed = 0;
-		can1_motor[5].setspeed = 0;
-		can1_motor[6].setspeed = 0;
-		can1_motor[7].setspeed = 0;
-		can2_motor[0].setspeed = 0;
-		can2_motor[1].setspeed = 0;
-		DMmotor[0].setSpeed = 0;
-		DMmotor[1].setSpeed = 0;
-		DMmotor[2].setSpeed = 0;
+	else
+	{
+		ctrl.StopMotors();
 	}
 }
 
@@ -190,20 +198,29 @@ void RC::Decode()
 	m_lastValidFrameTick = xTaskGetTickCount();
 	m_hasValidFrame = true;
 
-	rc.ch[0] = ((m_frame[0] | m_frame[1] << 8) & 0x07FF) - 1024;
-	rc.ch[1] = ((m_frame[1] >> 3 | m_frame[2] << 5) & 0x07FF) - 1024;
-	rc.ch[2] = ((m_frame[2] >> 6 | m_frame[3] << 2 | m_frame[4] << 10) & 0x07FF) - 1024;
-	rc.ch[3] = ((m_frame[4] >> 1 | m_frame[5] << 7) & 0x07FF) - 1024;
-	if (rc.ch[0] <= 8 && rc.ch[0] >= -8)rc.ch[0] = 0;
-	if (rc.ch[1] <= 8 && rc.ch[1] >= -8)rc.ch[1] = 0;
-	if (rc.ch[2] <= 8 && rc.ch[2] >= -8)rc.ch[2] = 0;
-	if (rc.ch[3] <= 8 && rc.ch[3] >= -8)rc.ch[3] = 0;
+	input.ch[0] = ((m_frame[0] | m_frame[1] << 8) & 0x07FF) - 1024;
+	input.ch[1] = ((m_frame[1] >> 3 | m_frame[2] << 5) & 0x07FF) - 1024;
+	input.ch[2] = ((m_frame[2] >> 6 | m_frame[3] << 2 | m_frame[4] << 10) & 0x07FF) - 1024;
+	input.ch[3] = ((m_frame[4] >> 1 | m_frame[5] << 7) & 0x07FF) - 1024;
+	if (input.ch[0] <= 8 && input.ch[0] >= -8)
+	{
+		input.ch[0] = 0;
+	}
+	if (input.ch[1] <= 8 && input.ch[1] >= -8)
+	{
+		input.ch[1] = 0;
+	}
+	if (input.ch[2] <= 8 && input.ch[2] >= -8)
+	{
+		input.ch[2] = 0;
+	}
+	if (input.ch[3] <= 8 && input.ch[3] >= -8)
+	{
+		input.ch[3] = 0;
+	}
 
-	pre_rc.s[0] = rc.s[0];
-	pre_rc.s[1] = rc.s[1];
-
-	rc.s[0] = ((m_frame[5] >> 4) & 0x0C) >> 2;
-	rc.s[1] = ((m_frame[5] >> 4) & 0x03);
+	input.s[0] = ((m_frame[5] >> 4) & 0x0C) >> 2;
+	input.s[1] = ((m_frame[5] >> 4) & 0x03);
 
 	pc.x = m_frame[6] | (m_frame[7] << 8);
 	pc.y = m_frame[8] | (m_frame[9] << 8);
@@ -218,7 +235,7 @@ void RC::Decode()
 
 bool RC::Shift_mode()
 {
-	if (rc.s[0] != pre_rc.s[0] || rc.s[1] != pre_rc.s[1])
+	if (input.s[0] != previous.s[0] || input.s[1] != previous.s[1])
 	{
 		return true;
 	}

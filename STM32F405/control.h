@@ -14,7 +14,7 @@ public:
 	Motor* shooter_motor[SHOOTER_MOTOR_NUM]{};
 	Motor* supply_motor[SUPPLY_MOTOR_NUM]{};
 	
-	enum MODE { PC, RC, AUTOAIM, RESET, ROTATION, SPINNING, FOLLOW, SEPARATE, FIRE, STOP } mode;
+	enum MODE { PC, RC, AUTOAIM, RESET, YAW_FOLLOW, SPINNING, RC_FOLLOW, SEPARATE, FIRE, STOP, PANTILE_CONTROL } mode;
 	struct CHASSIS
 	{
 
@@ -52,6 +52,7 @@ public:
 		bool single_shot_ready = false;
 		int16_t shoot_speed = 6000;
 		void RequestSingleShot(int16_t channel);
+		void ManualFire();
 		void Update();
 	};
 
@@ -62,6 +63,13 @@ public:
 	static int16_t Setrange(const int16_t original, const int16_t range);
 	void Control_Pantile(int32_t ch_yaw, int32_t ch_pitch);
 	void Control_Chassis(float speedx, float speedy, float speedz);
+	void HoldPose();
+	void MoveYaw();
+	void MovePitch();
+	void StopMotors();
+	void SeparateDrive();
+	void VisionFire();
+	void StopVision();
 	float GetDelta(float delta);
 	void Init(std::vector<Motor*> motor);
 	void init_dm();

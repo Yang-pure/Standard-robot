@@ -3,6 +3,7 @@
 #include "judgement.h"
 #include "HTmotor.h"
 #include "RC.h"
+#include "xuc.h"
 
 void CONTROL::Init(std::vector<Motor*> motor)
 {
@@ -78,6 +79,209 @@ void CONTROL::SHOOTER::RequestSingleShot(int16_t channel)
 		single_shot_ready = false;
 	}
 }
+
+void CONTROL::HoldPose()
+{
+	pantile_motor[0]->setangle = pantile_motor[0]->angle[now];
+	DMmotor[0].setPos = DMmotor[0].pos;
+	DMmotor[1].setPos = DMmotor[1].pos;
+	rc.sumPos = DMmotor[2].pos;
+	if (rc.sumPos > 1.0f)
+	{
+		rc.sumPos = 1.0f;
+	}
+	else if (rc.sumPos < -1.0f)
+	{
+		rc.sumPos = -1.0f;
+	}
+	DMmotor[2].setPos = rc.sumPos;
+	DMmotor[0].setSpeed = 0;
+	DMmotor[1].setSpeed = 0;
+	DMmotor[2].setSpeed = 0;
+}
+
+void CONTROL::MoveYaw()
+{
+	if (mode == YAW_FOLLOW && (rc.input.ch[3] >= 100 || rc.input.ch[3] <= -100))
+	{
+		pantile_motor[0]->setangle += -rc.input.ch[3] * 30.f / 660.f;
+	}
+	else if (mode == PANTILE_CONTROL && (rc.input.ch[2] >= 100 || rc.input.ch[2] <= -100))
+	{
+		pantile_motor[0]->setangle += -rc.input.ch[2] * 30.f / 660.f;
+	}
+	else if (mode == SPINNING && (rc.input.ch[0] >= 100 || rc.input.ch[0] <= -100))
+	{
+		pantile_motor[0]->setangle += -rc.input.ch[0] * 30.f / 660.f;
+	}
+}
+
+void CONTROL::MovePitch()
+{
+	if (mode == PANTILE_CONTROL || mode == RC_FOLLOW)
+	{
+		rc.sumPos += -rc.input.ch[3] * 0.01f / 660.f;
+	}
+	else if (mode == SPINNING)
+	{
+		rc.sumPos += -rc.input.ch[1] * 0.01f / 660.f;
+	}
+	if (rc.sumPos > 1.0f)
+	{
+		rc.sumPos = 1.0f;
+	}
+	else if (rc.sumPos < -1.0f)
+	{
+		rc.sumPos = -1.0f;
+	}
+	DMmotor[2].setPos = rc.sumPos;
+	DMmotor[2].setSpeed = 2.0f;
+}
+
+void CONTROL::StopMotors()
+{
+	chassis.speedx = 0;
+	chassis.speedy = 0;
+	chassis.speedz = 0;
+	can1_motor[0].setspeed = 0;
+	can1_motor[1].setspeed = 0;
+	can1_motor[2].setspeed = 0;
+	can1_motor[3].setspeed = 0;
+	can1_motor[4].setspeed = 0;
+	can1_motor[5].setspeed = 0;
+	can1_motor[6].setspeed = 0;
+	can1_motor[7].setspeed = 0;
+	can2_motor[0].setspeed = 0;
+	can2_motor[1].setspeed = 0;
+	DMmotor[0].setSpeed = 0;
+	DMmotor[1].setSpeed = 0;
+	DMmotor[2].setSpeed = 0;
+}
+
+void CONTROL::SeparateDrive()
+{
+	DMmotor[0].setPos = -rc.input.ch[3] * 1.5f / 660.f;
+	DMmotor[0].setSpeed = 1.5f;
+	DMmotor[1].setPos = rc.input.ch[3] * 1.5f / 660.f;
+	DMmotor[1].setSpeed = 1.5f;
+	can1_motor[5].setspeed = -3000;
+	can1_motor[6].setspeed = 3000;
+	chassis.speedx = rc.input.ch[0] * para.max_speed / 660.f;
+	chassis.speedy = rc.input.ch[1] * para.max_speed / 660.f;
+	if (rc.input.ch[2] > 100 || rc.input.ch[2] < -100)
+	{
+		chassis.speedz = rc.input.ch[2] * para.max_speed / 660.f;
+	}
+	else
+	{
+		chassis.speedz = 0;
+	}
+}
+
+void CONTROL::SHOOTER::ManualFire()
+{
+	if (rc.input.ch[3] > 500)
+	{
+		ctrl.supply_motor[0]->spinning = true;
+		ctrl.supply_motor[0]->pd = false;
+		ctrl.supply_motor[0]->need_curcircle = 0;
+		ctrl.supply_motor[0]->setspeed = rc.input.ch[3] * 4000.f / 660.f;
+		single_shot_ready = false;
+		openRub = true;
+	}
+	else
+	{
+		ctrl.supply_motor[0]->spinning = false;
+		RequestSingleShot(rc.input.ch[2] > 500 ? rc.input.ch[2] : 0);
+		openRub = rc.input.ch[2] > 500 || ctrl.supply_motor[0]->pd || ctrl.supply_motor[0]->need_curcircle != 0;
+		if (!ctrl.supply_motor[0]->pd && ctrl.supply_motor[0]->need_curcircle == 0)
+		{
+			ctrl.supply_motor[0]->setspeed = 0;
+		}
+	}
+}
+
+void CONTROL::StopVision()
+{
+	rc.visionShot.Reset();
+	supply_motor[0]->pd = false;
+	supply_motor[0]->need_curcircle = 0;
+	supply_motor[0]->spinning = false;
+	supply_motor[0]->setspeed = 0;
+	shooter.openRub = false;
+	pantile_motor[0]->setangle = pantile_motor[0]->angle[now];
+	rc.sumPos = DMmotor[2].pos;
+	if (rc.sumPos > 1.0f)
+	{
+		rc.sumPos = 1.0f;
+	}
+	else if (rc.sumPos < -1.0f)
+	{
+		rc.sumPos = -1.0f;
+	}
+	DMmotor[2].setPos = rc.sumPos;
+}
+
+void CONTROL::VisionFire()
+{
+	shooter.supply_bullet = true;
+	if (!rc.visionActive)
+	{
+		rc.visionActive = true;
+		rc.visionShot.Reset();
+		xuc.InvalidateVisionCommand();
+		pantile_motor[0]->setangle = pantile_motor[0]->angle[now];
+		DMmotor[2].setPos = rc.sumPos;
+		DMmotor[2].setSpeed = 8.0f;
+	}
+	const TickType_t nowTick = xTaskGetTickCount();
+	RxPacket_TJ command{};
+	const bool valid = xuc.GetVisionCommand(command, nowTick);
+	Motor* feeder = supply_motor[0];
+	const int32_t readyRpm = (shooter.shoot_speed < shooter_motor[0]->maxspeed ? shooter.shoot_speed : shooter_motor[0]->maxspeed) * 4 / 5;
+	const bool frictionReady = std::abs(shooter_motor[0]->curspeed) >= readyRpm && std::abs(shooter_motor[1]->curspeed) >= readyRpm;
+	const bool singleBusy = feeder->pd || feeder->need_curcircle != 0;
+	const VisionShotAction action = rc.visionShot.Update(valid ? command.shoot_TJ : 0, valid, frictionReady, singleBusy, nowTick * portTICK_PERIOD_MS);
+
+	if (!valid)
+	{
+		feeder->pd = false;
+		feeder->need_curcircle = 0;
+		feeder->spinning = false;
+		feeder->setspeed = 0;
+	}
+	else
+	{
+		float yawTarget = 0.0f, pitchTarget = 0.0f;
+		if (VisionAim(command.yaw_TJ, command.pitch_TJ, imu_pantile.GetAngleYaw(), imu_pantile.GetAnglePitch(), pantile_motor[0]->angle[now], DMmotor[2].pos, yawTarget, pitchTarget))
+		{
+			pantile_motor[0]->setangle = yawTarget;
+			DMmotor[2].setPos = pitchTarget;
+			DMmotor[2].setSpeed = 8.0f;
+		}
+		feeder->spinning = action.feed;
+		if (action.feed)
+		{
+			feeder->setspeed = para.ace_speed;
+		}
+		else if (!singleBusy)
+		{
+			feeder->setspeed = 0;
+		}
+		if (action.single)
+		{
+			feeder->pd = true;
+		}
+		if (action.abortSingle)
+		{
+			feeder->pd = false;
+			feeder->need_curcircle = 0;
+			feeder->setspeed = 0;
+		}
+	}
+	shooter.openRub = action.flywheel;
+}
+
 void CONTROL::CHASSIS::Keep_Direction()
 {
 	Motor* yaw_motor = ctrl.pantile_motor[PANTILE::YAW];
@@ -109,7 +313,7 @@ void CONTROL::CHASSIS::Keep_Direction()
 
 void CONTROL::CHASSIS::Update()
 {
-	if (ctrl.mode == CONTROL::ROTATION)
+	if (ctrl.mode == CONTROL::YAW_FOLLOW)
 	{
 		Keep_Direction();
 	}
@@ -137,7 +341,7 @@ void CONTROL::SHOOTER::Update()
 		supply_bullet = false;
 		auto_shoot = false;
 	}
-	const int16_t speed = ((ctrl.mode == SPINNING || ctrl.mode == FIRE )&& openRub) ? shoot_speed : 0;
+	const int16_t speed = ((ctrl.mode == SPINNING || ctrl.mode == FIRE) && openRub) ? shoot_speed : 0;
 	ctrl.shooter_motor[0]->setspeed = speed;
 	ctrl.shooter_motor[1]->setspeed = -speed;
 	if (ctrl.supply_motor[0]->setangle > 8192.0)

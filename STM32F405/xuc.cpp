@@ -49,7 +49,13 @@ void XUC::Decode()
 			if (!VerifyCRC16CheckSum(packet, packetLen))
 				continue;
 
-			memcpy(&Rx_TJ, packet, packetLen);
+			RxPacket_TJ received{};
+			memcpy(&received, packet, packetLen);
+			taskENTER_CRITICAL();
+			Rx_TJ = received;
+			m_lastVisionTick = xTaskGetTickCount();
+			m_hasVisionCommand = true;
+			taskEXIT_CRITICAL();
 			if (Rx_TJ.control_TJ == 0)
 			{
 				yaw = pitch = 0.0f;
@@ -63,7 +69,28 @@ void XUC::Decode()
 			}
 			return;
 		}
+		// 串口收到损坏或非协议帧时，不沿用上一条射击指令。
+		InvalidateVisionCommand();
 	}
+}
+
+void XUC::InvalidateVisionCommand()
+{
+	taskENTER_CRITICAL();
+	m_hasVisionCommand = false;
+	taskEXIT_CRITICAL();
+}
+
+bool XUC::GetVisionCommand(RxPacket_TJ& command, TickType_t now)
+{
+	TickType_t receivedTick = 0;
+	bool received = false;
+	taskENTER_CRITICAL();
+	command = Rx_TJ;
+	receivedTick = m_lastVisionTick;
+	received = m_hasVisionCommand;
+	taskEXIT_CRITICAL();
+	return received && (now - receivedTick) <= pdMS_TO_TICKS(100) && command.control_TJ != 0 && command.shoot_TJ <= 2 && std::isfinite(command.yaw_TJ) && std::isfinite(command.pitch_TJ);
 }
 
 void XUC::Encode()

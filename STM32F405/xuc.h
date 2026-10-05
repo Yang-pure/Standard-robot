@@ -72,8 +72,12 @@ public:
 	void Init(UART* huart, USART_TypeDef* Instance, uint32_t BaudRate);
 	void Decode();
 	void Encode();
+	void InvalidateVisionCommand();
+	bool GetVisionCommand(RxPacket_TJ& command, TickType_t now);
 
 private:
+	TickType_t m_lastVisionTick = 0;
+	bool m_hasVisionCommand = false;
 	QueueHandle_t* queue_handler = NULL;
 	BaseType_t pd_Rx = pdFALSE, pd_Tx = pdFALSE;
 	UART* m_uart = nullptr;

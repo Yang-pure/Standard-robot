@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include <cmath>
 #include <cinttypes>
+#include "vision_logic.h"
 
 #define RC_STATE(s0, s1) ( ((s0) << 8) | (s1) )
 
@@ -24,11 +25,13 @@ public:
 	bool top_mode = true;
 	bool fix = false;
 
+	float sumPos{};
+
 	struct
 	{
 		int16_t ch[4];
 		uint8_t s[2];
-	}rc, pre_rc;
+	}input, previous;
 
 	enum POSITION { UP = 1, DOWN, MID };
 	struct PC
@@ -53,6 +56,9 @@ public:
 	void RC_Control();
 
 private:
+	friend class CONTROL;
+	bool visionActive = false;
+	VisionShot visionShot;
 	volatile TickType_t m_lastValidFrameTick = 0;
 	volatile bool m_hasValidFrame = false;
 	QueueHandle_t* queueHandler = NULL;
