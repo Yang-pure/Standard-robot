@@ -85,7 +85,7 @@ void CONTROL::HoldPose()
 	pantile_motor[0]->setangle = pantile_motor[0]->angle[now];
 	DMmotor[0].setPos = DMmotor[0].pos;
 	DMmotor[1].setPos = DMmotor[1].pos;
-	rc.sumPos = DMmotor[2].pos;
+	rc.sumPos = (rc.previous.s[0] == 0 && rc.previous.s[1] == 0) ? 0.0f : DMmotor[2].pos;
 	if (rc.sumPos > 1.0f)
 	{
 		rc.sumPos = 1.0f;
@@ -222,64 +222,64 @@ void CONTROL::StopVision()
 	DMmotor[2].setPos = rc.sumPos;
 }
 
-void CONTROL::VisionFire()
+void CONTROL::VisionFire() // FIRE 模式每轮调用：读取视觉目标，控制云台位置和射击输出。
 {
-	shooter.supply_bullet = true;
-	if (!rc.visionActive)
+	shooter.supply_bullet = true; // 标记进入视觉射击流程；实际拨弹仍由下方 feeder 指令决定。
+	if (!rc.visionActive) // 只在首次进入 FIRE 时清理上一次视觉会话。
 	{
-		rc.visionActive = true;
-		rc.visionShot.Reset();
-		xuc.InvalidateVisionCommand();
-		pantile_motor[0]->setangle = pantile_motor[0]->angle[now];
-		DMmotor[2].setPos = rc.sumPos;
-		DMmotor[2].setSpeed = 8.0f;
+		rc.visionActive = true; // 记录 FIRE 会话已启动，避免后续循环重复初始化。
+		rc.visionShot.Reset(); // 清除上一会话的连发、单发及超时状态。
+		xuc.InvalidateVisionCommand(); // 丢弃切入 FIRE 前收到的视觉帧，等待新命令。
+		pantile_motor[0]->setangle = pantile_motor[0]->angle[now]; // Yaw 先锁定当前编码器位置，避免沿用旧目标。
+		DMmotor[2].setPos = rc.sumPos; // Pitch 先沿用切模式时同步好的位置目标。
+		DMmotor[2].setSpeed = 2.0f; // Pitch 位置速度模式的最大运动速度设为 2 rad/s。
 	}
-	const TickType_t nowTick = xTaskGetTickCount();
-	RxPacket_TJ command{};
-	const bool valid = xuc.GetVisionCommand(command, nowTick) && imu_pantile.Fresh();
-	Motor* feeder = supply_motor[0];
-	const int32_t readyRpm = (shooter.shoot_speed < shooter_motor[0]->maxspeed ? shooter.shoot_speed : shooter_motor[0]->maxspeed) * 4 / 5;
-	const bool frictionReady = std::abs(shooter_motor[0]->curspeed) >= readyRpm && std::abs(shooter_motor[1]->curspeed) >= readyRpm;
-	const bool singleBusy = feeder->pd || feeder->need_curcircle != 0;
-	const VisionShotAction action = rc.visionShot.Update(valid ? command.shoot_TJ : 0, valid, frictionReady, singleBusy, nowTick * portTICK_PERIOD_MS);
+	const TickType_t nowTick = xTaskGetTickCount(); // 读取当前系统节拍，用于视觉帧时效和射击状态计时。
+	RxPacket_TJ command{}; // 准备接收本轮视觉命令，默认字段全部清零。
+	const bool valid = xuc.GetVisionCommand(command, nowTick) && imu_pantile.Fresh(); // 视觉命令与 IMU 反馈都有效才允许本轮瞄准和开火。
+	Motor* feeder = supply_motor[0]; // 指向拨弹电机，后续集中写入单发或连发指令。
+	const int32_t readyRpm = (shooter.shoot_speed < shooter_motor[0]->maxspeed ? shooter.shoot_speed : shooter_motor[0]->maxspeed) * 4 / 5; // 就绪阈值取目标与电机上限较小值的 80%。
+	const bool frictionReady = std::abs(shooter_motor[0]->curspeed) >= readyRpm && std::abs(shooter_motor[1]->curspeed) >= readyRpm; // 两只摩擦轮都达到阈值才允许供弹。
+	const bool singleBusy = feeder->pd || feeder->need_curcircle != 0; // 已请求单发或单发行程尚未结束时，不重置拨弹速度。
+	const VisionShotAction action = rc.visionShot.Update(valid ? command.shoot_TJ : 0, valid, frictionReady, singleBusy, nowTick * portTICK_PERIOD_MS); // 将 shoot=0/1/2 和电机状态转换为本轮摩擦轮、连发、单发动作。
 
-	if (!valid)
+	if (!valid) // 视觉帧或 IMU 失效时停止供弹；Yaw、Pitch 保持最后的位置目标。
 	{
-		feeder->pd = false;
-		feeder->need_curcircle = 0;
-		feeder->spinning = false;
-		feeder->setspeed = 0;
+		feeder->pd = false; // 撤销尚未执行的单发请求。
+		feeder->need_curcircle = 0; // 清除正在记录的单发行程状态。
+		feeder->spinning = false; // 关闭连续拨弹模式。
+		feeder->setspeed = 0; // 将拨弹速度目标清零。
 	}
-	else
+	else // 视觉和 IMU 均有效时，才根据新目标更新云台与拨弹。
 	{
-		float yawTarget = pantile_motor[0]->setangle, pitchTarget = DMmotor[2].setPos;
-		if (VisionAim(command.yaw_TJ, command.pitch_TJ, imu_pantile.GetAngleYaw(), imu_pantile.GetAnglePitch(), pantile_motor[0]->angle[now], DMmotor[2].pos, yawTarget, pitchTarget))
+		float yawTarget = pantile_motor[0]->setangle, pitchTarget = DMmotor[2].setPos; // 以上轮位置目标为起点，避免每轮从反馈值重新计算。
+		if (VisionAim(command.yaw_TJ, command.pitch_TJ, imu_pantile.GetAngleYaw(), imu_pantile.GetAnglePitch(), pantile_motor[0]->angle[now], DMmotor[2].pos, yawTarget, pitchTarget)) // Yaw 和 Pitch 均直接跟随视觉目标，计算限幅位置目标。
 		{
-			pantile_motor[0]->setangle = yawTarget;
-			DMmotor[2].setPos = pitchTarget;
-			DMmotor[2].setSpeed = 8.0f;
+			pantile_motor[0]->setangle = yawTarget; // 下发 Yaw 编码器位置目标；0.25° 视觉死区内保持原值。
+			DMmotor[2].setPos = pitchTarget; // 下发 Pitch DM 位置目标；VisionAim 已限制在 [-1,1]。
+			DMmotor[2].setSpeed = 2.0f; // 保持 Pitch 最大运动速度为 2 rad/s。
 		}
-		feeder->spinning = action.feed;
-		if (action.feed)
+		feeder->spinning = action.feed; // 连发动作使拨弹电机进入连续转动分支。
+		if (action.feed) // shoot=1 且摩擦轮就绪、单发未占用时连续拨弹。
 		{
-			feeder->setspeed = para.ace_speed;
+			feeder->setspeed = para.ace_speed; // 连发拨弹速度沿用工程参数。
 		}
-		else if (!singleBusy)
+		else if (!singleBusy) // 无连发且单发行程未占用时，停止拨弹速度指令。
 		{
-			feeder->setspeed = 0;
+			feeder->setspeed = 0; // 防止上一次连发速度残留。
 		}
-		if (action.single)
+		if (action.single) // shoot=2 满足再装填与摩擦轮就绪条件时触发一次单发。
 		{
-			feeder->pd = true;
+			feeder->pd = true; // 把单发请求交给拨弹电机的位置行程逻辑。
 		}
-		if (action.abortSingle)
+		if (action.abortSingle) // 单发执行超时后撤销请求，等待视觉 shoot 先回到 0。
 		{
-			feeder->pd = false;
-			feeder->need_curcircle = 0;
-			feeder->setspeed = 0;
+			feeder->pd = false; // 清除单发触发标志。
+			feeder->need_curcircle = 0; // 清除未完成的单发行程标志。
+			feeder->setspeed = 0; // 停止拨弹电机速度指令。
 		}
 	}
-	shooter.openRub = action.flywheel;
+	shooter.openRub = action.flywheel; // 按状态机输出启停摩擦轮；失效时 action 为 false。
 }
 
 void CONTROL::CHASSIS::Keep_Direction()

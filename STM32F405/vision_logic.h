@@ -3,7 +3,8 @@
 #include <cmath>
 #include <cstdint>
 
-// 视觉角度是 IMU 零点下的绝对角（度）；沿用上轮电机目标积分误差，补偿负载造成的静差。
+// 视觉目标和 IMU 当前角都用度；Yaw 电机目标用编码器值，Pitch 电机目标用弧度。
+// 每轮只把一小部分角度误差加到上轮位置目标；进入死区后保持目标，避免反复摆动。
 inline bool VisionAim(float targetYawDeg, float targetPitchDeg, float currentYawDeg, float currentPitchDeg, float yawEncoder, float pitchPosition, float& yawTarget, float& pitchTarget)
 {
     if (!std::isfinite(targetYawDeg) || !std::isfinite(targetPitchDeg) || !std::isfinite(currentYawDeg) || !std::isfinite(currentPitchDeg) || !std::isfinite(yawEncoder) || !std::isfinite(pitchPosition))
@@ -12,42 +13,48 @@ inline bool VisionAim(float targetYawDeg, float targetPitchDeg, float currentYaw
     }
 
     float yawError = std::remainder(targetYawDeg - currentYawDeg, 360.0f);
-    if (yawError > 10.0f)
+    if (std::fabs(yawError) > 0.25f)
     {
-        yawError = 10.0f;
-    }
-    if (yawError < -10.0f)
-    {
-        yawError = -10.0f;
-    }
-    yawTarget = yawEncoder + std::remainder(yawTarget - yawEncoder, 8192.0f);
-    yawTarget += yawError * (8192.0f / 360.0f) * 0.1f;
-    if (yawTarget > yawEncoder + 10.0f * 8192.0f / 360.0f)
-    {
-        yawTarget = yawEncoder + 10.0f * 8192.0f / 360.0f;
-    }
-    if (yawTarget < yawEncoder - 10.0f * 8192.0f / 360.0f)
-    {
-        yawTarget = yawEncoder - 10.0f * 8192.0f / 360.0f;
+        if (yawError > 10.0f)
+        {
+            yawError = 10.0f;
+        }
+        if (yawError < -10.0f)
+        {
+            yawError = -10.0f;
+        }
+        yawTarget = yawEncoder + std::remainder(yawTarget - yawEncoder, 8192.0f);
+        yawTarget += yawError * (8192.0f / 360.0f) * 0.05f;
+        if (yawTarget > yawEncoder + 10.0f * 8192.0f / 360.0f)
+        {
+            yawTarget = yawEncoder + 10.0f * 8192.0f / 360.0f;
+        }
+        if (yawTarget < yawEncoder - 10.0f * 8192.0f / 360.0f)
+        {
+            yawTarget = yawEncoder - 10.0f * 8192.0f / 360.0f;
+        }
     }
 
     float pitchError = targetPitchDeg - currentPitchDeg;
-    if (pitchError > 12.0f)
+    if (std::fabs(pitchError) > 0.25f) // 到达目标附近后保持当前电机目标，不再追逐 IMU 的细小波动。
     {
-        pitchError = 12.0f;
-    }
-    if (pitchError < -12.0f)
-    {
-        pitchError = -12.0f;
-    }
-    pitchTarget += pitchError * (3.1415926f / 180.0f) * 0.1f;
-    if (pitchTarget > pitchPosition + 12.0f * 3.1415926f / 180.0f)
-    {
-        pitchTarget = pitchPosition + 12.0f * 3.1415926f / 180.0f;
-    }
-    if (pitchTarget < pitchPosition - 12.0f * 3.1415926f / 180.0f)
-    {
-        pitchTarget = pitchPosition - 12.0f * 3.1415926f / 180.0f;
+        if (pitchError > 12.0f)
+        {
+            pitchError = 12.0f;
+        }
+        if (pitchError < -12.0f)
+        {
+            pitchError = -12.0f;
+        }
+        pitchTarget += pitchError * (3.1415926f / 180.0f) * 0.02f; // 小步推进位置目标，避免反馈延迟下反复越过目标。
+        if (pitchTarget > pitchPosition + 12.0f * 3.1415926f / 180.0f)
+        {
+            pitchTarget = pitchPosition + 12.0f * 3.1415926f / 180.0f;
+        }
+        if (pitchTarget < pitchPosition - 12.0f * 3.1415926f / 180.0f)
+        {
+            pitchTarget = pitchPosition - 12.0f * 3.1415926f / 180.0f;
+        }
     }
     if (pitchTarget > 1.0f)
     {
