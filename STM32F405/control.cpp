@@ -279,7 +279,7 @@ void CONTROL::VisionFire() // FIRE 模式每轮调用：读取视觉目标，控
 			feeder->setspeed = 0; // 停止拨弹电机速度指令。
 		}
 	}
-	shooter.openRub = action.flywheel; // 按状态机输出启停摩擦轮；失效时 action 为 false。
+	shooter.openRub = true; // 进入 FIRE 后摩擦轮持续运行，不受视觉指令或视觉帧有效性影响。
 }
 
 void CONTROL::CHASSIS::Keep_Direction()

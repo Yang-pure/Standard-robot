@@ -24,7 +24,7 @@ inline bool VisionAim(float targetYawDeg, float targetPitchDeg, float currentYaw
             yawError = -10.0f;
         }
         yawTarget = yawEncoder + std::remainder(yawTarget - yawEncoder, 8192.0f);
-        yawTarget += yawError * (8192.0f / 360.0f) * 0.05f;
+        yawTarget += yawError * (8192.0f / 360.0f) * 0.03f;
         if (yawTarget > yawEncoder + 10.0f * 8192.0f / 360.0f)
         {
             yawTarget = yawEncoder + 10.0f * 8192.0f / 360.0f;
