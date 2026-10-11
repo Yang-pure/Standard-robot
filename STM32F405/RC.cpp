@@ -162,6 +162,8 @@ void RC::RC_Control() {
 
 		case CONTROL::STOP:
 			ctrl.StopMotors();
+			ctrl.supply_motor[0]->spinning = true;
+			can1_motor[7].setspeed = input.ch[1] * 3000 / 660.f;
 			break;
 
 		case CONTROL::SPINNING:

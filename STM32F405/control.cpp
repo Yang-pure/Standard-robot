@@ -241,7 +241,7 @@ void CONTROL::VisionFire() // FIRE 模式每轮调用：读取视觉目标，控
 	const int32_t readyRpm = (shooter.shoot_speed < shooter_motor[0]->maxspeed ? shooter.shoot_speed : shooter_motor[0]->maxspeed) * 4 / 5; // 就绪阈值取目标与电机上限较小值的 80%。
 	const bool frictionReady = std::abs(shooter_motor[0]->curspeed) >= readyRpm && std::abs(shooter_motor[1]->curspeed) >= readyRpm; // 两只摩擦轮都达到阈值才允许供弹。
 	const bool singleBusy = feeder->pd || feeder->need_curcircle != 0; // 已请求单发或单发行程尚未结束时，不重置拨弹速度。
-	const VisionShotAction action = rc.visionShot.Update(valid ? command.shoot_TJ : 0, valid, frictionReady, singleBusy, nowTick * portTICK_PERIOD_MS); // 将 shoot=0/1/2 和电机状态转换为本轮摩擦轮、连发、单发动作。
+	const VisionShotAction action = rc.visionShot.Update(valid ? command.shoot_TJ : 0, valid, frictionReady, singleBusy, nowTick * portTICK_PERIOD_MS); // 将 shoot=0/1/2 和电机状态转换为本轮连发、单发动作。
 
 	if (!valid) // 视觉帧或 IMU 失效时停止供弹；Yaw、Pitch 保持最后的位置目标。
 	{
@@ -253,10 +253,10 @@ void CONTROL::VisionFire() // FIRE 模式每轮调用：读取视觉目标，控
 	else // 视觉和 IMU 均有效时，才根据新目标更新云台与拨弹。
 	{
 		float yawTarget = pantile_motor[0]->setangle, pitchTarget = DMmotor[2].setPos; // 以上轮位置目标为起点，避免每轮从反馈值重新计算。
-		if (VisionAim(command.yaw_TJ, command.pitch_TJ, imu_pantile.GetAngleYaw(), imu_pantile.GetAnglePitch(), pantile_motor[0]->angle[now], DMmotor[2].pos, yawTarget, pitchTarget)) // Yaw 和 Pitch 均直接跟随视觉目标，计算限幅位置目标。
+		if (VisionAim(command.yaw_TJ, command.pitch_TJ, imu_pantile.GetAngleYaw(), imu_pantile.GetAnglePitch(), pantile_motor[0]->angle[now], DMmotor[2].pos, yawTarget, pitchTarget)) // 根据视觉与 IMU 角度差，小步更新 Yaw 和 Pitch 的限幅位置目标。
 		{
-			pantile_motor[0]->setangle = yawTarget; // 下发 Yaw 编码器位置目标；0.25° 视觉死区内保持原值。
-			DMmotor[2].setPos = pitchTarget; // 下发 Pitch DM 位置目标；VisionAim 已限制在 [-1,1]。
+			pantile_motor[0]->setangle = yawTarget; // 下发 Yaw 编码器位置目标；0.03° 视觉死区内保持原值。
+			DMmotor[2].setPos = pitchTarget; // 下发 Pitch DM 位置目标；VisionAim 已限制在 [-0.5,0.5]。
 			DMmotor[2].setSpeed = 2.0f; // 保持 Pitch 最大运动速度为 2 rad/s。
 		}
 		feeder->spinning = action.feed; // 连发动作使拨弹电机进入连续转动分支。
