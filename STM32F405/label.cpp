@@ -5,9 +5,11 @@
 
 void PARAMETER::Init()
 {
-	pitch_min = 0, pitch_max = 8192, initial_pitch = 4096, initial_yaw = 5714;
+	// 本地配置的 Yaw 编码器参考值为 7352，供 Keep_Direction 换算平移方向使用。
+	pitch_min = 0, pitch_max = 8192, initial_pitch = 4096, initial_yaw = 7352;
 	imu_pitch_max = 18, imu_pitch_min = 16;
-	ace_speed = 4000, max_speed = 3000, rota_speed = 3000;
+	// ace_speed 控制 FIRE 连发拨弹；max_speed 同时决定遥控底盘比例和单轮目标限幅。
+	ace_speed = 1000, max_speed = 5500, rota_speed = 3000;
 	pitch_speed = 2, yaw_speed = 2;
 }
 

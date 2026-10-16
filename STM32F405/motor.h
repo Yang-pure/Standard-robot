@@ -53,7 +53,8 @@ public:
 	uint16_t need_curcircle;
 	static int16_t getdeltaa(int16_t diff);
 	uint8_t getStatus()const;
-	int32_t current{}, curspeed{}, setcurrent{},setspeed{}, torque_current, motor_status, motor_angle_status, sum_angle{};//这个current用于输出电流或者电压
+	// testspeed 当前未在工程中读写，不参与电机控制。
+	int32_t current{}, curspeed{}, setcurrent{},setspeed{},testspeed{}, torque_current, motor_status, motor_angle_status, sum_angle{};//这个current用于输出电流或者电压
 	int16_t adjspeed{};
 	int16_t maxspeed{}, maxcurrent{2000};
 	Kalman currentKalman{ 1.f,40.f };

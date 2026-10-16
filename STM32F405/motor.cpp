@@ -235,7 +235,8 @@ void Motor::getmax(const type_t type)
 		break;
 	case M2006:
 		maxcurrent = 10000;
-		adjspeed = 1000;
+		// ACE 单发行程的速度上限；连续拨弹使用外部写入的 setspeed。
+		adjspeed = 2000;
 		maxspeed = 3000;
 		break;
 	default:;

@@ -38,7 +38,7 @@ void CONTROL::Init(std::vector<Motor*> motor)
 void CONTROL::Control_Chassis(float speedx, float speedy, float speedz)
 
 {
-	
+
 	const int32_t wheel_speed[4] = {
 		static_cast<int32_t>(+speedx + speedy +  speedz), // ID1 后右  后右
 		static_cast<int32_t>(+speedx - speedy +  speedz), // ID2 后左  前右
@@ -164,10 +164,34 @@ void CONTROL::SeparateDrive()
 	DMmotor[0].setSpeed = 1.5f;
 	DMmotor[1].setPos = rc.input.ch[3] * 1.5f / 660.f;
 	DMmotor[1].setSpeed = 1.5f;
-	can1_motor[5].setspeed = -3000;
-	can1_motor[6].setspeed = 3000;
+	// SEPARATE 模式下两条前履带使用固定速度目标。
+	can1_motor[5].setspeed = -4000;
+	can1_motor[6].setspeed = 4000;
 	chassis.speedx = rc.input.ch[0] * para.max_speed / 660.f;
 	chassis.speedy = rc.input.ch[1] * para.max_speed / 660.f;
+	if (rc.input.ch[2] > 100 || rc.input.ch[2] < -100)
+	{
+		chassis.speedz = rc.input.ch[2] * para.max_speed / 660.f;
+	}
+	else
+	{
+		chassis.speedz = 0;
+	}
+}
+
+void CONTROL::BumpyRoadDrive()
+{
+	// 起伏路段沿用腿部和履带控制，腿部行程按 ch[3] 给出。
+	DMmotor[0].setPos = -rc.input.ch[3] * 1.6f / 660.f;
+	DMmotor[0].setSpeed = 1.5f;
+	DMmotor[1].setPos = rc.input.ch[3] * 1.6f / 660.f;
+	DMmotor[1].setSpeed = 1.5f;
+	can1_motor[5].setspeed = -4000;
+	can1_motor[6].setspeed = 4000;
+
+	// ch[0]/ch[1] 的平移方向取反；ch[2] 的旋转方向与 SEPARATE 相同。
+	chassis.speedx = -rc.input.ch[0] * para.max_speed / 660.f;
+	chassis.speedy = -rc.input.ch[1] * para.max_speed / 660.f;
 	if (rc.input.ch[2] > 100 || rc.input.ch[2] < -100)
 	{
 		chassis.speedz = rc.input.ch[2] * para.max_speed / 660.f;
@@ -313,7 +337,8 @@ void CONTROL::CHASSIS::Keep_Direction()
 
 void CONTROL::CHASSIS::Update()
 {
-	if (ctrl.mode == CONTROL::YAW_FOLLOW)
+	// 当前只有 PANTILE_CONTROL 把云台方向作为底盘平移参考；YAW_FOLLOW 直接使用摇杆坐标。
+	if (ctrl.mode == CONTROL::PANTILE_CONTROL)
 	{
 		Keep_Direction();
 	}

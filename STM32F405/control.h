@@ -14,7 +14,8 @@ public:
 	Motor* shooter_motor[SHOOTER_MOTOR_NUM]{};
 	Motor* supply_motor[SUPPLY_MOTOR_NUM]{};
 	
-	enum MODE { PC, RC, AUTOAIM, RESET, YAW_FOLLOW, SPINNING, RC_FOLLOW, SEPARATE, FIRE, STOP, PANTILE_CONTROL } mode;
+	// BUMPY_ROAD 对应遥控器左下右中；其后的模式编号因新增枚举顺延。
+	enum MODE { PC, RC, AUTOAIM, RESET, YAW_FOLLOW, SPINNING, RC_FOLLOW, SEPARATE, BUMPY_ROAD, FIRE, STOP, PANTILE_CONTROL } mode;
 	struct CHASSIS
 	{
 
@@ -68,6 +69,7 @@ public:
 	void MovePitch();
 	void StopMotors();
 	void SeparateDrive();
+	void BumpyRoadDrive();
 	void VisionFire();
 	void StopVision();
 	float GetDelta(float delta);

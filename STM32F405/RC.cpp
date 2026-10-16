@@ -79,7 +79,8 @@ void RC::RC_CheckState() {
 		break;
 
 	case RC_STATE(DOWN, MID):
-		ctrl.mode = CONTROL::FIRE;
+		// 左下右中用于起伏路段：平移方向按车尾为前方处理。
+		ctrl.mode = CONTROL::BUMPY_ROAD;
 		break;
 
 	case RC_STATE(DOWN, DOWN):
@@ -94,14 +95,15 @@ void RC::RC_CheckState() {
 }
 
 void RC::RC_Control() {
-	if (ctrl.mode != CONTROL::YAW_FOLLOW && ctrl.mode != CONTROL::RC_FOLLOW && ctrl.mode != CONTROL::PANTILE_CONTROL && ctrl.mode != CONTROL::SEPARATE)
+	// 起伏路段同样需要底盘运动和前履带转动，切入该模式时不能先清零这些目标。
+	if (ctrl.mode != CONTROL::YAW_FOLLOW && ctrl.mode != CONTROL::RC_FOLLOW && ctrl.mode != CONTROL::PANTILE_CONTROL && ctrl.mode != CONTROL::SEPARATE && ctrl.mode != CONTROL::BUMPY_ROAD)
 	{
 		ctrl.chassis.speedx = 0;
 		ctrl.chassis.speedy = 0;
 		ctrl.chassis.speedz = 0;
 		ctrl.Control_Chassis(0, 0, 0);
 	}
-	if (ctrl.mode != CONTROL::SEPARATE)
+	if (ctrl.mode != CONTROL::SEPARATE && ctrl.mode != CONTROL::BUMPY_ROAD)
 	{
 		can1_motor[5].setspeed = 0;
 		can1_motor[6].setspeed = 0;
@@ -151,6 +153,10 @@ void RC::RC_Control() {
 
 		case CONTROL::SEPARATE:
 			ctrl.SeparateDrive();
+			break;
+
+		case CONTROL::BUMPY_ROAD:
+			ctrl.BumpyRoadDrive();
 			break;
 
 		case CONTROL::AUTOAIM:
